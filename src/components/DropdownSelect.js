@@ -1,5 +1,11 @@
 import React, {useState, useEffect} from 'react';
-import {View, Text, StyleSheet, TouchableOpacity} from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+} from 'react-native';
 import {Divider} from 'react-native-paper';
 
 const DropdownSelect = ({options, placeholder, onSelect, selectedValue}) => {
@@ -35,15 +41,21 @@ const DropdownSelect = ({options, placeholder, onSelect, selectedValue}) => {
       {showOptions && (
         <>
           <Divider />
-          <View style={styles.optionsContainer}>
+          <ScrollView
+            style={styles.optionsContainer}
+            nestedScrollEnabled={true}
+            showsVerticalScrollIndicator={true}
+            bounces={false}
+            keyboardShouldPersistTaps="handled">
             {options.map((option, index) => (
               <TouchableOpacity
                 key={index}
                 onPress={() => handleSelect(option)}>
                 <Text style={styles.option}>{option.label}</Text>
+                <Divider />
               </TouchableOpacity>
             ))}
-          </View>
+          </ScrollView>
         </>
       )}
     </View>
@@ -56,7 +68,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     width: '100%',
     marginVertical: 5,
-    borderRadius: 5,
+    borderRadius: 2,
+    borderColor: '#a5b4fc',
+    borderWidth: 1,
   },
   selectContainer: {
     flexDirection: 'row',
@@ -65,6 +79,7 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 2,
     width: '100%',
+    borderRadius: 2,
   },
   selectedOption: {
     fontSize: 14,
@@ -79,19 +94,14 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   optionsContainer: {
-    position: 'relative',
-    top: 0,
-    left: 0,
-    right: 0,
+    maxHeight: 150,
     backgroundColor: 'white',
     borderRadius: 2,
-    padding: 15,
-    zIndex: 1,
   },
   option: {
     fontSize: 14,
     color: '#333',
-    paddingVertical: 7,
+    padding: 15,
   },
 });
 

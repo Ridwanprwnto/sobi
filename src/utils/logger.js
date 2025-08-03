@@ -1,8 +1,6 @@
 // logger.js
 import {logger} from 'react-native-logs';
 import RNFS from 'react-native-fs';
-import axios from 'axios';
-import {Platform} from 'react-native';
 
 const logFilePath = `${RNFS.DocumentDirectoryPath}/app.log`;
 
@@ -56,44 +54,19 @@ const clearLogs = async () => {
   }
 };
 
-const uploadLogFile = async () => {
-  const api = axios.create({
-    baseURL: API_BASE_URL,
-    timeout: 10000, // 10 seconds timeout
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
+const logFile = async () => {
   try {
     const exists = await RNFS.exists(logFilePath);
     if (!exists) {
       log.warn('Log File - logger: No log file found to upload.');
       return;
     }
-
-    const fileName = `app-log-${new Date().toISOString()}.log`;
-
-    const formData = new FormData();
-    formData.append('file', {
-      uri: `file://${logFilePath}`,
-      type: 'text/plain',
-      name: fileName,
-    });
-
-    formData.append('platform', Platform.OS);
-    formData.append('timestamp', new Date().toISOString());
-
-    const response = await api.post('/upload-log', {formData});
-
-    log.info(
-      'Log Upload - logger: Log file uploaded successfully:',
-      response.data,
-    );
-    return response.data;
+    const filelog = `file://${logFilePath}`;
+    return filelog;
   } catch (error) {
     log.error('Log Upload - logger: Failed to upload log file:', error);
     throw error;
   }
 };
 
-export {log, getLogs, clearLogs, uploadLogFile, logFilePath};
+export {log, getLogs, clearLogs, logFile, logFilePath};

@@ -56,7 +56,7 @@ function MainTabNavigator() {
         name="Opname"
         component={OpnameStackScreen}
         options={{
-          tabBarLabel: 'Opname',
+          tabBarLabel: 'Stock Opname',
           tabBarIcon: ({color}) => (
             <MaterialDesignIcons
               name="clipboard-text-search"

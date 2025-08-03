@@ -6,33 +6,24 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import {
-  Appbar,
-  Text,
-  List,
-  Divider,
-  ActivityIndicator,
-} from 'react-native-paper';
+import {Appbar, Text, List, Divider} from 'react-native-paper';
 import {useNavigation, useFocusEffect} from '@react-navigation/native';
 import {AuthContext} from '../../../contexts/AuthContext';
 import DropdownSelect from '../../../components/DropdownSelect';
 import FormInput from '../../../components/FormInput';
+import {useLoading} from '../../../utils/loading';
+import LoadingMain from '../../../components/Loading';
 import {log} from '../../../utils/logger';
 
 export default function OpnameScreen() {
-  const {
-    user,
-    loading,
-    logout,
-    checkAndRefreshToken,
-    dataDraftSOContext,
-    dataDraftOpname,
-    dataItemsSOContext,
-    dataItemsOpname,
-  } = useContext(AuthContext);
+  const {user, logout, withValidToken, dataDraftSOContext, dataItemsSOContext} =
+    useContext(AuthContext);
 
   const navigation = useNavigation();
 
+  const {loading, withLoading} = useLoading();
+  const [dataDraftOpname, setDataDraftOpname] = useState([]);
+  const [dataItemsOpname, setDataItemsOpname] = useState([]);
   const [dateSO, setDateSO] = useState('');
   const [resetCount, setResetCount] = useState(0);
   const [selectedOptionNoref, setSelectedOptionNoref] = useState(null);
@@ -49,55 +40,63 @@ export default function OpnameScreen() {
       label: item.noRefSO,
       value: item.noRefSO,
     }));
-    setDataNoref(norefOptions);
+    setDataNoref(prev => {
+      const prevStr = JSON.stringify(prev);
+      const nextStr = JSON.stringify(norefOptions);
+      return prevStr !== nextStr ? norefOptions : prev;
+    });
   }, [dataDraftOpname]);
 
   useFocusEffect(
     React.useCallback(() => {
       const fetchData = async () => {
-        try {
-          resetInput();
-          await checkAndRefreshToken();
-          await dataDraftSOContext(user.officeCode, user.deptCode);
-          log.info('Opname - Screen:', 'Success get data draft opname');
-        } catch (error) {
-          resetInput();
-          log.error('Opname - Screen', error.message || error);
-        }
+        await withLoading(async () => {
+          try {
+            resetInput();
+            const result = await withValidToken(() =>
+              dataDraftSOContext(user.officeCode, user.deptCode),
+            );
+            setDataDraftOpname(result);
+            log.info('Opname - Screen:', 'Success get data draft opname');
+          } catch (error) {
+            resetInput();
+            log.error('Opname - Screen', error.message || error);
+          }
+        });
       };
       fetchData();
     }, []),
   );
 
-  useEffect(() => {
-    const fetchDataItems = async () => {
-      if (selectedOptionNoref) {
+  const handleSelectNoref = async option => {
+    const selected = option ? option.value : null;
+    setSelectedOptionNoref(selected);
+    setDateSO('');
+    setDataItemsOpname([]);
+
+    if (selected) {
+      await withLoading(async () => {
         try {
-          await dataItemsSOContext(selectedOptionNoref);
+          const result = await withValidToken(() =>
+            dataItemsSOContext(selected),
+          );
+          setDataItemsOpname(result);
+          if (result?.date) {
+            setDateSO(result.date);
+          }
           log.info(
             'Opname - Screen:',
-            `Success get data items for ${selectedOptionNoref}`,
+            `Success get data items for ${selected}`,
           );
         } catch (error) {
           log.error('Opname - Screen', error.message || error);
           Alert.alert('Error', 'Gagal mengambil data items');
         }
-      }
-    };
-    fetchDataItems();
-  }, [selectedOptionNoref]);
-
-  const handleSelectNoref = option => {
-    setSelectedOptionNoref(option ? option.value : null);
+      });
+    }
   };
 
-  useEffect(() => {
-    if (dataItemsOpname?.date) {
-      setDateSO(dataItemsOpname.date);
-    }
-  }, [dataItemsOpname]);
-
-  const handleProccessOpname = async () => {
+  const handleProccessOpname = React.useCallback(async () => {
     if (selectedOptionNoref === null || dateSO.trim() === '') {
       log.info('Opname - Screen:', 'Noref belum ada yang dipilih');
       Alert.alert('Info', 'Noref belum ada yang dipilih');
@@ -112,18 +111,44 @@ export default function OpnameScreen() {
       log.error('Opname - Screen', error.message || error);
       Alert.alert('Info', error.message || error);
     }
+  }, [selectedOptionNoref, dateSO, navigation]);
+
+  const handleLogout = () => {
+    Alert.alert('Logout Confirmation', 'Apakah Anda yakin ingin keluar?', [
+      {
+        text: 'Batal',
+        onPress: () => log.info('Logout dibatalkan'),
+        style: 'cancel',
+      },
+      {
+        text: 'Keluar',
+        onPress: () => logout(),
+      },
+    ]);
   };
+
+  if (loading) {
+    return (
+      <>
+        <Appbar.Header>
+          <Appbar.Content title="Stock Opname" />
+          <Appbar.Action icon="logout" onPress={handleLogout} />
+        </Appbar.Header>
+        <LoadingMain text="Processing..." />
+      </>
+    );
+  }
 
   return (
     <>
       <Appbar.Header>
-        <Appbar.Content title="Opname" />
-        <Appbar.Action icon="logout" onPress={logout} />
+        <Appbar.Content title="Stock Opname" />
+        <Appbar.Action icon="logout" onPress={handleLogout} />
       </Appbar.Header>
       <ScrollView contentContainerStyle={styles.container}>
         <View accessibilityRole="header">
           <View style={styles.header}>
-            <Text style={styles.textHeader}>Entry Data Opname</Text>
+            <Text style={styles.textHeader}>Select Draft Opname</Text>
           </View>
           <View style={styles.mainContent}>
             <DropdownSelect
@@ -137,7 +162,7 @@ export default function OpnameScreen() {
             />
             {selectedOptionNoref && (
               <>
-                <FormInput placeholder="Date" value={dateSO} disabled={true} />
+                <FormInput placeholder="Date" value={dateSO} disabled />
                 <View style={styles.listContent}>
                   <List.Item
                     title="Items"
@@ -172,19 +197,11 @@ export default function OpnameScreen() {
               disabled={loading}
               accessibilityRole="button"
               accessibilityLabel="Opname button">
-              <Text style={styles.buttonText}>Mulai Opname</Text>
+              <Text style={styles.buttonText}>Process Stock Opname</Text>
             </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
-      {loading && (
-        <View style={styles.loadingOverlay}>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#6366f1" />
-            <Text style={styles.loadingText}>Memproses...</Text>
-          </View>
-        </View>
-      )}
     </>
   );
 }
@@ -215,6 +232,7 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'stretch',
     gap: 2,
+    marginBottom: 20,
   },
   listContent: {
     overflow: 'hidden',
@@ -222,6 +240,8 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     fontSize: 14,
     marginTop: 6,
+    borderColor: '#a5b4fc',
+    borderWidth: 1,
   },
   button: {
     backgroundColor: '#6366f1',
@@ -255,25 +275,5 @@ const styles = StyleSheet.create({
     color: '#1e40af',
     alignSelf: 'center',
     marginRight: 8,
-  },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-  },
-  loadingContainer: {
-    elevation: 3,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
-    marginTop: 10,
-    color: '#1e293b',
   },
 });

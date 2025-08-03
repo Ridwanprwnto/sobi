@@ -1,39 +1,65 @@
 import React, {useContext} from 'react';
-import {View, StyleSheet, ScrollView} from 'react-native';
-import {
-  Appbar,
-  Text,
-  List,
-  Divider,
-  ActivityIndicator,
-} from 'react-native-paper';
+import {View, StyleSheet, ScrollView, Alert} from 'react-native';
+import {Appbar, Text, List, Divider} from 'react-native-paper';
 import MaterialDesignIcons from '@react-native-vector-icons/material-design-icons';
 import {useFocusEffect} from '@react-navigation/native';
 import {AuthContext} from '../../../contexts/AuthContext';
+import {useLoading} from '../../../utils/loading';
+import LoadingMain from '../../../components/Loading';
 import {log} from '../../../utils/logger';
 
 export default function ProfileScreen() {
-  const {user, loading, logout, checkAndRefreshToken} = useContext(AuthContext);
+  const {user, logout, refreshToken} = useContext(AuthContext);
+
+  const {loading, withLoading} = useLoading();
 
   useFocusEffect(
     React.useCallback(() => {
       const fetchData = async () => {
-        try {
-          await checkAndRefreshToken();
-          log.info('Profile - Screen:', 'Success get refresh token');
-        } catch (error) {
-          log.error('Profile - Screen', error.message || error);
-        }
+        await withLoading(async () => {
+          try {
+            await refreshToken();
+            log.info('Profile - Screen:', 'Success get refresh token');
+          } catch (error) {
+            log.error('Profile - Screen', error.message || error);
+          }
+        });
       };
       fetchData();
     }, []),
   );
 
+  const handleLogout = () => {
+    Alert.alert('Logout Confirmation', 'Apakah Anda yakin ingin keluar?', [
+      {
+        text: 'Batal',
+        onPress: () => log.info('Logout dibatalkan'),
+        style: 'cancel',
+      },
+      {
+        text: 'Keluar',
+        onPress: () => logout(),
+      },
+    ]);
+  };
+
+  if (loading) {
+    return (
+      <>
+        <Appbar.Header>
+          <Appbar.Content title="Profile" />
+          <Appbar.Action icon="logout" onPress={handleLogout} />
+        </Appbar.Header>
+        <LoadingMain text="Processing..." />
+      </>
+    );
+  }
+
   return (
     <>
       <Appbar.Header>
         <Appbar.Content title="Profile" />
-        <Appbar.Action icon="logout" onPress={logout} />
+        <Appbar.Action icon="logout" onPress={handleLogout} />
       </Appbar.Header>
       <ScrollView contentContainerStyle={styles.container}>
         <View accessibilityRole="header">
@@ -71,7 +97,7 @@ export default function ProfileScreen() {
               left={() => (
                 <MaterialDesignIcons
                   style={styles.iconItem}
-                  name="warehouse"
+                  name="office-building-marker-outline"
                   size={26}
                 />
               )}
@@ -83,7 +109,7 @@ export default function ProfileScreen() {
               left={() => (
                 <MaterialDesignIcons
                   style={styles.iconItem}
-                  name="account-tie"
+                  name="warehouse"
                   size={26}
                 />
               )}
@@ -104,14 +130,6 @@ export default function ProfileScreen() {
           </View>
         </View>
       </ScrollView>
-      {loading && (
-        <View style={styles.loadingOverlay}>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#6366f1" />
-            <Text style={styles.loadingText}>Memproses...</Text>
-          </View>
-        </View>
-      )}
     </>
   );
 }
@@ -138,8 +156,11 @@ const styles = StyleSheet.create({
   mainContent: {
     overflow: 'hidden',
     backgroundColor: 'white',
+    borderColor: '#a5b4fc',
+    borderWidth: 1,
     borderRadius: 2,
     fontSize: 14,
+    marginBottom: 20,
   },
   itemTitle: {
     fontSize: 14,

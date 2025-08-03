@@ -3,34 +3,29 @@ import storage from '../utils/storage';
 import {authService} from '../services/authService';
 import {opnameService} from '../services/opnameService';
 import {conditionService} from '../services/conditionService';
+import {helpService} from '../services/helpService';
 import {log} from '../utils/logger';
 
 export const AuthContext = createContext({
   isAuthenticated: false,
   user: null,
-  dataDraftOpname: [],
-  dataItemsOpname: [],
-  dataPersentaseOpname: [],
-  dataCondition: [],
   loading: false,
   login: async () => {},
   logout: async () => {},
-  checkAndRefreshToken: async () => {},
+  loadingContext: async () => {},
+  refreshToken: async () => {},
   dataDraftSOContext: async () => {},
   dataItemsSOContext: async () => {},
   dataPersentaseSOContext: async () => {},
   dataCheckItemSOContext: async () => {},
   saveItemSOContext: async () => {},
   dataConditionContext: async () => {},
+  handleSendLogFileContext: async () => {},
 });
 
 export const AuthProvider = ({children}) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [dataDraftOpname, setDataDraftOpname] = useState([]);
-  const [dataItemsOpname, setDataItemsOpname] = useState([]);
-  const [dataPersentaseOpname, setDataPersentaseOpname] = useState([]);
-  const [dataCondition, setDataCondition] = useState([]);
 
   // Load token and restore user on mount
   useEffect(() => {
@@ -61,13 +56,35 @@ export const AuthProvider = ({children}) => {
     try {
       const token = await storage.getToken();
       const response = await authService.getUser(token);
-      if (response.token) {
-        log.info(
-          'Refresh Token - Auth: ',
-          response.user || 'Success to refresh auth token',
-        );
-        await storage.saveToken(response.token);
-        return response.token;
+
+      if (response?.success) {
+        const newToken = response.token;
+
+        if (newToken) {
+          log.info(
+            'Refresh Token - Auth: ',
+            response.user?.username || 'Success to refresh auth token',
+          );
+
+          await storage.saveToken(newToken);
+
+          const payloadBase64 = newToken.split('.')[1];
+          const decoded = JSON.parse(atob(payloadBase64));
+
+          await storage.setTokenExpiration(decoded.exp);
+
+          setUser(response.user);
+
+          return newToken;
+        } else {
+          log.info(
+            'Refresh Token - Auth: Token masih valid, tidak ada token baru',
+          );
+          return token;
+        }
+      } else {
+        log.warn('Refresh Token - Token tidak valid di server');
+        await logout();
       }
     } catch (error) {
       log.error('Refresh Token - Auth: ', error);
@@ -84,13 +101,18 @@ export const AuthProvider = ({children}) => {
       if (response.token) {
         log.info('Login - Auth: ', response.user || 'Success to login');
         await storage.saveToken(response.token);
+
+        const payloadBase64 = response.token.split('.')[1];
+        const decoded = JSON.parse(atob(payloadBase64));
+        await storage.setTokenExpiration(decoded.exp);
+
         setUser(response.user);
       } else {
         log.error('Login - Auth: ', response.error || 'Invalid login response');
         throw new Error(response.error || 'Invalid login response');
       }
     } catch (error) {
-      log.error('Login - Auth: ', error);
+      log.error('Login - Auth: Failed connect to server', error);
       throw error;
     } finally {
       setLoading(false);
@@ -111,98 +133,77 @@ export const AuthProvider = ({children}) => {
     setLoading(false);
   };
 
-  // Function to check and refresh token before making API calls
-  const checkAndRefreshToken = async () => {
-    setLoading(true);
-    try {
-      const token = await storage.getToken();
-      if (token) {
-        const newToken = await refreshToken();
-        return newToken || token;
-      }
-      return null;
-    } catch (error) {
-      log.error('Check & Refresh Token - Auth: ', error);
-      return null;
-    } finally {
-      setLoading(false);
+  const withValidToken = async fn => {
+    await refreshToken();
+    return await fn();
+  };
+
+  const loadingContext = bool => {
+    if (typeof bool !== 'boolean') {
+      console.error('Expected a boolean value for loadingContext');
+      return;
     }
+    setLoading(bool);
   };
 
   // -------------------------------------------------------------------
 
   // Function
   const dataDraftSOContext = async (office, department) => {
-    setLoading(true);
     try {
       const response = await opnameService.dataDraftSOService(
         office,
         department,
       );
       if (response.success == true) {
-        setDataDraftOpname(response.data);
         log.info('Get Draft Opname - Auth: ', response.data);
+        return response.data;
       } else {
-        setDataDraftOpname([]);
         log.error('Get Draft Opname - Auth: ', response.message);
         throw new Error(response.message);
       }
     } catch (error) {
-      setDataDraftOpname([]);
       log.error('Get Draft Opname - Auth: ', error);
       throw error;
-    } finally {
-      setLoading(false);
     }
   };
 
   // Function
   const dataItemsSOContext = async noref => {
-    setLoading(true);
     try {
       const response = await opnameService.dataItemsSOService(noref);
       if (response.success == true) {
-        setDataItemsOpname(response);
         log.info('Get Items Opname - Auth: ', response);
+        return response;
       } else {
-        setDataItemsOpname([]);
         log.error('Get Items Opname - Auth: ', response.message);
         throw new Error(response.message);
       }
     } catch (error) {
-      setDataItemsOpname([]);
       log.error('Get Items Opname - Auth: ', error);
       throw error;
-    } finally {
-      setLoading(false);
     }
   };
 
   // Function
   const dataPersentaseSOContext = async noref => {
-    setLoading(true);
     try {
       const response = await opnameService.dataPersentaseSOService(noref);
       if (response.success == true) {
-        setDataPersentaseOpname(response);
         log.info('Get Persentase Opname - Auth: ', response);
+        return response;
       } else {
-        setDataPersentaseOpname([]);
         log.error('Get Persentase Opname - Auth: ', response.message);
         throw new Error(response.message);
       }
     } catch (error) {
-      setDataPersentaseOpname([]);
       log.error('Get Persentase Opname - Auth: ', error);
       throw error;
-    } finally {
-      setLoading(false);
     }
   };
 
   // Function
   const dataCheckItemSOContext = async (noref, noid) => {
-    setLoading(true);
     try {
       const response = await opnameService.dataCheckItemSOService(noref, noid);
       if (response.success == true) {
@@ -215,8 +216,6 @@ export const AuthProvider = ({children}) => {
     } catch (error) {
       log.error('Check Item Opname - Auth: ', error);
       throw error;
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -230,7 +229,6 @@ export const AuthProvider = ({children}) => {
     user,
     photo,
   ) => {
-    setLoading(true);
     try {
       const response = await opnameService.saveItemSOService(
         noref,
@@ -242,8 +240,8 @@ export const AuthProvider = ({children}) => {
         photo,
       );
       if (response.success == true) {
-        log.info('Save Item Opname - Auth: ', response.data);
-        return response.data;
+        log.info('Save Item Opname - Auth: ', response);
+        return response;
       } else {
         log.error('Save Item Opname - Auth: ', response.message);
         throw new Error(response.message);
@@ -251,8 +249,6 @@ export const AuthProvider = ({children}) => {
     } catch (error) {
       log.error('Save Item Opname - Auth: ', error);
       throw error;
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -260,44 +256,39 @@ export const AuthProvider = ({children}) => {
 
   // Function
   const dataConditionContext = async () => {
-    setLoading(true);
     try {
       const token = await storage.getToken();
       if (token) {
         const response = await conditionService.dataConditionService(token);
-        setDataCondition(response.kondisi);
         log.info(
           'Get Condition - Auth: ',
           'Success to load auth token',
           response,
         );
+        return response.kondisi;
       }
     } catch (error) {
-      setDataCondition([]);
       log.error('Get Condition - Auth: ', error);
       throw error;
-    } finally {
-      setLoading(false);
     }
   };
 
   // -------------------------------------------------------------------
 
   // Function
-  const handleSendLogFile = async () => {
-    setLoading(true);
+  const handleSendLogFileContext = async (message, logfile) => {
     try {
-      const response = await uploadLogFile();
-      log.info(
-        'Send Log - Auth: ',
-        'Success send log to the server',
-        response.message,
-      );
+      const response = await helpService.sendLogFileService(message, logfile);
+      if (response.success == true) {
+        log.info('Send Log File - Auth: ', response.data);
+        return response.data;
+      } else {
+        log.error('Send Log File - Auth: ', response.message);
+        throw new Error(response.message);
+      }
     } catch (error) {
-      log.error('Send Log - Auth: ', error);
+      log.error('Send Log File - Auth: ', error);
       throw error;
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -306,21 +297,19 @@ export const AuthProvider = ({children}) => {
       value={{
         isAuthenticated: !!user,
         user,
-        dataDraftOpname,
-        dataItemsOpname,
-        dataPersentaseOpname,
-        dataCondition,
         loading,
         login,
         logout,
-        checkAndRefreshToken,
+        loadingContext,
+        withValidToken,
+        refreshToken,
         dataDraftSOContext,
         dataItemsSOContext,
         dataPersentaseSOContext,
         dataCheckItemSOContext,
         dataConditionContext,
         saveItemSOContext,
-        handleSendLogFile,
+        handleSendLogFileContext,
       }}>
       {children}
     </AuthContext.Provider>

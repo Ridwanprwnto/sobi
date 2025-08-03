@@ -6,77 +6,116 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
-import {Appbar, Text, ActivityIndicator} from 'react-native-paper';
+import {Appbar, Text} from 'react-native-paper';
 import {useFocusEffect} from '@react-navigation/native';
 import {AuthContext} from '../../../contexts/AuthContext';
-import {log, uploadLogFile} from '../../../utils/logger';
+import {useLoading} from '../../../utils/loading';
+import LoadingMain from '../../../components/Loading';
+import {log, logFile} from '../../../utils/logger';
 import TextArea from '../../../components/TextArea';
 
 export default function HelpScreen() {
-  const {loading, logout, checkAndRefreshToken, handleSendLogFile} =
+  const {logout, withValidToken, refreshToken, handleSendLogFileContext} =
     useContext(AuthContext);
   const [messageLogs, setMessageLogs] = useState('');
+
+  const {loading, withLoading} = useLoading();
 
   useFocusEffect(
     React.useCallback(() => {
       const fetchData = async () => {
-        try {
-          await checkAndRefreshToken();
-          log.info('Help Center - Screen:', 'Success get refresh token');
-        } catch (error) {
-          log.error('Help Center - Screen', error.message || error);
-        }
+        await withLoading(async () => {
+          try {
+            setMessageLogs('');
+            await refreshToken();
+            log.info('Help Center - Screen:', 'Success get refresh token');
+          } catch (error) {
+            log.error('Help Center - Screen', error.message || error);
+          }
+        });
       };
       fetchData();
     }, []),
   );
 
   const handleSendLogPress = async () => {
-    log.info('Help Center - Screen:', 'Username and Password are required');
-    Alert.alert('Send Log', 'Success send log to the server');
-    return;
-    try {
-      log.info('Help Center:', 'Success send log to the server');
-      await handleSendLogFile();
-    } catch (error) {
-      log.error('Help Center', error.message || error);
-      Alert.alert('Send Log Error', error.message || error);
+    if (messageLogs.trim() === '') {
+      Alert.alert('Info', 'Gagal mengirim log pesan masih kosong');
+      return;
     }
+    await withLoading(async () => {
+      try {
+        const logPath = await logFile();
+        if (logPath) {
+          await withValidToken(async () => {
+            setMessageLogs('');
+            await handleSendLogFileContext(messageLogs, logPath);
+          });
+        }
+        log.info('Help Center - Screen:', 'Success send log to the server');
+        Alert.alert('Info', ' Success send log to the server');
+        return;
+      } catch (error) {
+        log.error('Help Center - Screen', error.message || error);
+        Alert.alert('Send Log Error', error.message || error);
+      }
+    });
   };
+
+  const handleLogout = () => {
+    Alert.alert('Logout Confirmation', 'Apakah Anda yakin ingin keluar?', [
+      {
+        text: 'Batal',
+        onPress: () => log.info('Logout dibatalkan'),
+        style: 'cancel',
+      },
+      {
+        text: 'Keluar',
+        onPress: () => logout(),
+      },
+    ]);
+  };
+
+  if (loading) {
+    return (
+      <>
+        <Appbar.Header>
+          <Appbar.Content title="Help Center" />
+          <Appbar.Action icon="logout" onPress={handleLogout} />
+        </Appbar.Header>
+        <LoadingMain text="Processing..." />
+      </>
+    );
+  }
 
   return (
     <>
       <Appbar.Header>
         <Appbar.Content title="Help Center" />
-        <Appbar.Action icon="logout" onPress={logout} />
+        <Appbar.Action icon="logout" onPress={handleLogout} />
       </Appbar.Header>
-
       <ScrollView contentContainerStyle={styles.container}>
         <View accessibilityRole="header">
           <View style={styles.header}>
-            <Text style={styles.textHeader}>Report Help</Text>
+            <Text style={styles.textHeader}>Send Messages and Log</Text>
           </View>
-          <TextArea placeholder="Enter message" value={messageLogs} />
           <View style={styles.mainContent}>
+            <TextArea
+              placeholder="Enter message"
+              value={messageLogs}
+              onChangeText={setMessageLogs}
+            />
             <TouchableOpacity
               style={[styles.button, loading && styles.buttonDisabled]}
               onPress={handleSendLogPress}
               disabled={loading}
               accessibilityRole="button"
               accessibilityLabel="Login button">
-              <Text style={styles.buttonText}>Send Message Help Center</Text>
+              <Text style={styles.buttonText}>Send to Server</Text>
             </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
-      {loading && (
-        <View style={styles.loadingOverlay}>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#6366f1" />
-            <Text style={styles.loadingText}>Memproses...</Text>
-          </View>
-        </View>
-      )}
     </>
   );
 }

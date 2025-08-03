@@ -1,6 +1,9 @@
 import axios from 'axios';
-import {API_BASE_URL} from 'react-native-dotenv';
+import Config from 'react-native-config';
 import {log} from '../utils/logger';
+
+const API_URL = Config.API_BASE_URL + Config.API_PATH;
+const SERVICE_PATH = '/opname';
 
 /**
  * opnameService.js
@@ -8,7 +11,7 @@ import {log} from '../utils/logger';
  */
 
 const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: API_URL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -17,7 +20,10 @@ const api = axios.create({
 
 const dataDraftSOService = async (office, department) => {
   try {
-    const response = await api.post('/draftso', {office, department});
+    const response = await api.post(`${SERVICE_PATH}/draftso`, {
+      office,
+      department,
+    });
     log.info('Get Draft Opname - Service: ', response.data.data);
     return response.data;
   } catch (error) {
@@ -33,7 +39,7 @@ const dataDraftSOService = async (office, department) => {
 
 const dataItemsSOService = async noref => {
   try {
-    const response = await api.post('/itemso', {noref});
+    const response = await api.post(`${SERVICE_PATH}/itemso`, {noref});
     log.info('Get Items Opname - Service: ', response.data.data);
     return response.data;
   } catch (error) {
@@ -49,7 +55,7 @@ const dataItemsSOService = async noref => {
 
 const dataPersentaseSOService = async noref => {
   try {
-    const response = await api.post('/persentaseso', {noref});
+    const response = await api.post(`${SERVICE_PATH}/persentaseso`, {noref});
     log.info('Get Persentase Opname - Service: ', response.data);
     return response.data;
   } catch (error) {
@@ -65,7 +71,7 @@ const dataPersentaseSOService = async noref => {
 
 const dataCheckItemSOService = async (noref, noid) => {
   try {
-    const response = await api.post('/updateso', {noref, noid});
+    const response = await api.post(`${SERVICE_PATH}/updateso`, {noref, noid});
     log.info('Check Item Opname - Service: ', response.data.data);
     return response.data;
   } catch (error) {
@@ -89,7 +95,7 @@ const saveItemSOService = async (
   photo,
 ) => {
   try {
-    const response = await api.post('/saveso', {
+    const response = await api.post(`${SERVICE_PATH}/saveso`, {
       noref,
       nocode,
       noid,
@@ -98,7 +104,7 @@ const saveItemSOService = async (
       user,
       photo,
     });
-    log.info('Save Item Opname - Service: ', response.data.data);
+    log.info('Save Item Opname - Service: ', response.data);
     return response.data;
   } catch (error) {
     if (error.response && error.response.data && error.response.data.message) {

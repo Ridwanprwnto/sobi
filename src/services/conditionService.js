@@ -1,6 +1,9 @@
 import axios from 'axios';
-import {API_BASE_URL} from 'react-native-dotenv';
+import Config from 'react-native-config';
 import {log} from '../utils/logger';
+
+const API_URL = Config.API_BASE_URL + Config.API_PATH;
+const SERVICE_PATH = '/master';
 
 /**
  * opnameService.js
@@ -8,7 +11,7 @@ import {log} from '../utils/logger';
  */
 
 const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: API_URL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -17,7 +20,7 @@ const api = axios.create({
 
 const dataConditionService = async token => {
   try {
-    const response = await api.get('/kondisi', {
+    const response = await api.get(`${SERVICE_PATH}/kondisi`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },

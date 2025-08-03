@@ -1,55 +1,78 @@
-import React, {useContext} from 'react';
-import {View, StyleSheet, ScrollView} from 'react-native';
-import {
-  Text,
-  Appbar,
-  List,
-  Divider,
-  ActivityIndicator,
-} from 'react-native-paper';
+import React, {useState, useContext} from 'react';
+import {View, StyleSheet, ScrollView, Alert} from 'react-native';
+import {Text, Appbar, List, Divider} from 'react-native-paper';
 import {useFocusEffect} from '@react-navigation/native';
 import {AuthContext} from '../../../contexts/AuthContext';
+import {useLoading} from '../../../utils/loading';
+import LoadingMain from '../../../components/Loading';
 import {log} from '../../../utils/logger';
 
 export default function HomeScreen() {
-  const {
-    user,
-    loading,
-    logout,
-    checkAndRefreshToken,
-    dataDraftSOContext,
-    dataDraftOpname,
-  } = useContext(AuthContext);
+  const {user, logout, withValidToken, dataDraftSOContext} =
+    useContext(AuthContext);
+  const {loading, withLoading} = useLoading();
+
+  const [dataDraftOpname, setDataDraftOpname] = useState([]);
 
   useFocusEffect(
     React.useCallback(() => {
       const fetchData = async () => {
-        try {
-          await checkAndRefreshToken();
-          await dataDraftSOContext(user.officeCode, user.deptCode);
-          log.info('Home - Screen:', 'Success get data draft opname');
-        } catch (error) {
-          log.error('Home - Screen', error.message || error);
-        }
+        await withLoading(async () => {
+          try {
+            const result = await withValidToken(() =>
+              dataDraftSOContext(user.officeCode, user.deptCode),
+            );
+            setDataDraftOpname(result);
+            log.info('Home - Screen:', 'Success get data draft opname');
+          } catch (error) {
+            log.error('Home - Screen', error.message || error);
+          }
+        });
       };
       fetchData();
     }, []),
   );
 
+  const handleLogout = () => {
+    Alert.alert('Logout Confirmation', 'Apakah Anda yakin ingin keluar?', [
+      {
+        text: 'Batal',
+        onPress: () => log.info('Logout dibatalkan'),
+        style: 'cancel',
+      },
+      {
+        text: 'Keluar',
+        onPress: () => logout(),
+      },
+    ]);
+  };
+
+  if (loading) {
+    return (
+      <>
+        <Appbar.Header>
+          <Appbar.Content title="Home" />
+          <Appbar.Action icon="logout" onPress={handleLogout} />
+        </Appbar.Header>
+        <LoadingMain text="Processing..." />
+      </>
+    );
+  }
+
   return (
     <>
       <Appbar.Header>
         <Appbar.Content title="Home" />
-        <Appbar.Action icon="logout" onPress={logout} />
+        <Appbar.Action icon="logout" onPress={handleLogout} />
       </Appbar.Header>
       <ScrollView contentContainerStyle={styles.container}>
         <View accessibilityRole="header">
           <View style={styles.header}>
-            <Text style={styles.textHeader}>Opname Process</Text>
+            <Text style={styles.textHeader}>Stock Opname Progress Summary</Text>
           </View>
           <View style={styles.mainContent}>
             {dataDraftOpname && dataDraftOpname.length > 0 ? (
-              <View style={styles.mainContent}>
+              <View style={styles.listContent}>
                 <List.Item
                   title="Items"
                   titleStyle={styles.itemTitle}
@@ -83,14 +106,6 @@ export default function HomeScreen() {
           </View>
         </View>
       </ScrollView>
-      {loading && (
-        <View style={styles.loadingOverlay}>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#6366f1" />
-            <Text style={styles.loadingText}>Memproses...</Text>
-          </View>
-        </View>
-      )}
     </>
   );
 }
@@ -118,6 +133,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 2,
     fontSize: 14,
+    marginBottom: 20,
+  },
+  listContent: {
+    borderWidth: 1,
+    borderRadius: 2,
+    borderColor: '#a5b4fc',
   },
   itemTitle: {
     fontSize: 14,
@@ -141,25 +162,5 @@ const styles = StyleSheet.create({
   noDataText: {
     fontSize: 14,
     color: '#4b5563',
-  },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-  },
-  loadingContainer: {
-    elevation: 3,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
-    marginTop: 10,
-    color: '#1e293b',
   },
 });

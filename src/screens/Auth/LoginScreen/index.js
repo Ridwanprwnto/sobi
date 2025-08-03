@@ -9,16 +9,11 @@ import {
   Image,
   ScrollView,
 } from 'react-native';
-import {Text, TextInput, ActivityIndicator} from 'react-native-paper';
-import {
-  APP_NAME,
-  APP_DESC,
-  APP_COPYRIGHT,
-  APP_DEVELOPER,
-  APP_VERSION,
-} from 'react-native-dotenv';
+import {Text, TextInput} from 'react-native-paper';
+import Config from 'react-native-config';
 import {log} from '../../../utils/logger';
 import appLogo from '../../../assets/images/app-icon.png';
+import LoadingMain from '../../../components/Loading';
 
 import {AuthContext} from '../../../contexts/AuthContext';
 
@@ -35,13 +30,21 @@ export default function LoginScreen() {
       return;
     }
     try {
-      log.info('Login - Screen:', 'Success login with username:', username);
       await login(username.trim(), password);
+      log.info('Login - Screen:', 'Success login with username:', username);
     } catch (error) {
       log.error('Login - Screen', error.message || error);
       Alert.alert('Login Error', error.message || error);
     }
   };
+
+  if (loading) {
+    return (
+      <>
+        <LoadingMain text="" />
+      </>
+    );
+  }
 
   return (
     <>
@@ -50,8 +53,8 @@ export default function LoginScreen() {
           behavior={Platform.select({ios: 'padding', android: undefined})}>
           <View style={styles.header}>
             <Image source={appLogo} style={styles.logo} resizeMode="contain" />
-            <Text style={styles.appName}>{APP_NAME}</Text>
-            <Text style={styles.appDesc}>{APP_DESC}</Text>
+            <Text style={styles.appName}>{Config.APP_NAME}</Text>
+            <Text style={styles.appDesc}>{Config.API_BASE_URL}</Text>
           </View>
           <View style={styles.form}>
             <TextInput
@@ -92,27 +95,19 @@ export default function LoginScreen() {
           </View>
           <View style={styles.footer}>
             <Text style={styles.footerText}>
-              {APP_COPYRIGHT}. {APP_DEVELOPER}
+              {Config.APP_COPYRIGHT}. {Config.APP_DEVELOPER}
             </Text>
-            <Text style={styles.versionText}>v{APP_VERSION}</Text>
+            <Text style={styles.versionText}>v{Config.APP_VERSION}</Text>
           </View>
         </KeyboardAvoidingView>
       </ScrollView>
-      {loading && (
-        <View style={styles.loadingOverlay}>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#6366f1" />
-            <Text style={styles.loadingText}></Text>
-          </View>
-        </View>
-      )}
     </>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flexGrow: 1,
     backgroundColor: '#e0e7ff',
     justifyContent: 'center',
     paddingHorizontal: 24,
@@ -159,7 +154,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 2,
     paddingHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 8,
     fontSize: 16,
     color: '#1e293b',
     backgroundColor: '#f8fafc',
@@ -180,7 +175,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   footer: {
-    marginTop: 24,
+    marginTop: 14,
     alignItems: 'center',
     fontSize: 14,
   },
@@ -193,25 +188,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#64748b',
     fontSize: 14,
-  },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-  },
-  loadingContainer: {
-    elevation: 3,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
-    marginTop: 10,
-    color: '#1e293b',
   },
 });

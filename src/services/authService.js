@@ -1,6 +1,9 @@
 import axios from 'axios';
-import {API_BASE_URL} from 'react-native-dotenv';
+import Config from 'react-native-config';
 import {log} from '../utils/logger';
+
+const API_URL = Config.API_BASE_URL + Config.API_PATH;
+const SERVICE_PATH = '/auth';
 
 /**
  * authService.js
@@ -8,7 +11,7 @@ import {log} from '../utils/logger';
  */
 
 const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: API_URL,
   timeout: 10000, // 10 seconds timeout
   headers: {
     'Content-Type': 'application/json',
@@ -17,7 +20,10 @@ const api = axios.create({
 
 const login = async (username, password) => {
   try {
-    const response = await api.post('/login', {username, password});
+    const response = await api.post(`${SERVICE_PATH}/login`, {
+      username,
+      password,
+    });
     log.info('Login - Service: ', response.data.user);
     return response.data;
   } catch (error) {
@@ -26,14 +32,14 @@ const login = async (username, password) => {
     } else {
       message = error.message;
     }
-    log.error('Login - Service: ', message || error);
+    log.error('Login - Service: Failed connect to server', message || error);
     throw message || error;
   }
 };
 
 const getUser = async token => {
   try {
-    const response = await api.get('/validation', {
+    const response = await api.get(`${SERVICE_PATH}/validation`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },

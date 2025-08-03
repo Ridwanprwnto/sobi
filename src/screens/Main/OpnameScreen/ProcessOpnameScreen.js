@@ -9,11 +9,14 @@ import {
 import {
   Appbar,
   Text,
-  ActivityIndicator,
   Snackbar,
   ProgressBar,
   MD3Colors,
   List,
+  Modal,
+  Portal,
+  Button,
+  Divider,
 } from 'react-native-paper';
 import {
   useNavigation,
@@ -26,18 +29,17 @@ import DropdownSelect from '../../../components/DropdownSelect';
 import FormInput from '../../../components/FormInput';
 import TextArea from '../../../components/TextArea';
 import CameraInput from '../../../components/CameraInput';
+import {useLoading} from '../../../utils/loading';
+import LoadingMain from '../../../components/Loading';
 import {log} from '../../../utils/logger';
 
 export default function ProcessOpnameScreen() {
   const {
     user,
-    loading,
     logout,
-    checkAndRefreshToken,
+    withValidToken,
     dataPersentaseSOContext,
-    dataPersentaseOpname,
     dataConditionContext,
-    dataCondition,
     dataCheckItemSOContext,
     saveItemSOContext,
   } = useContext(AuthContext);
@@ -47,14 +49,22 @@ export default function ProcessOpnameScreen() {
   const route = useRoute();
   const {dataNoref} = route.params;
 
+  const {loading, withLoading} = useLoading();
   const [dataSN, setDataSN] = useState();
   const [location, setLocation] = useState();
   const [dataKondisi, setDataKondisi] = useState([]);
+  const [dataPersentaseOpname, setDataPersentaseOpname] = useState([]);
   const [selectedOptionKondisi, setSelectedOptionKondisi] = useState(null);
-  const [persentaseSO, setPersentaseSO] = useState('');
+  const [persentaseSO, setPersentaseSO] = useState();
+  const [dataCondition, setDataCondition] = useState([]);
   const [checkingItemOpname, setCheckingItemOpname] = useState([]);
   const [resetCount, setResetCount] = useState(0);
   const [photoUri, setPhotoUri] = useState(null);
+
+  // State untuk modal
+  const [modalVisible, setModalVisible] = useState(false);
+  const [previewItems, setPreviewItems] = useState([]);
+  const [selectedItem, setSelectedItem] = useState(null);
 
   const resetInput = () => {
     setDataSN('');
@@ -62,6 +72,7 @@ export default function ProcessOpnameScreen() {
     setCheckingItemOpname([]);
     setSelectedOptionKondisi(null);
     setPhotoUri(null);
+    setSelectedItem(null);
     setResetCount(prevCount => prevCount + 1);
   };
 
@@ -80,19 +91,26 @@ export default function ProcessOpnameScreen() {
   useFocusEffect(
     React.useCallback(() => {
       const fetchData = async () => {
-        try {
-          resetInput();
-          await checkAndRefreshToken();
-          await dataConditionContext();
-          await dataPersentaseSOContext(dataNoref.noref);
-          log.info(
-            'Proccess Opname - Screen:',
-            'Success get data persentase opname',
-          );
-        } catch (error) {
-          resetInput();
-          log.error('Proccess Opname - Screen', error.message || error);
-        }
+        await withLoading(async () => {
+          try {
+            resetInput();
+            await withValidToken(async () => {
+              const resultCondition = await dataConditionContext();
+              const resultPersentase = await dataPersentaseSOContext(
+                dataNoref.noref,
+              );
+              setDataCondition(resultCondition);
+              setDataPersentaseOpname(resultPersentase);
+            });
+            log.info(
+              'Proccess Opname - Screen:',
+              'Success get data persentase opname',
+            );
+          } catch (error) {
+            resetInput();
+            log.error('Proccess Opname - Screen', error.message || error);
+          }
+        });
       };
       fetchData();
     }, []),
@@ -118,19 +136,47 @@ export default function ProcessOpnameScreen() {
       Alert.alert('Info', 'Nomor serial number masih kosong');
       return;
     }
-    try {
-      const result = await dataCheckItemSOContext(dataNoref.noref, dataSN);
-      if (Array.isArray(result)) {
-        setCheckingItemOpname(result);
+    await withLoading(async () => {
+      try {
+        const result = await withValidToken(() =>
+          dataCheckItemSOContext(dataNoref.noref, dataSN),
+        );
+        if (Array.isArray(result) && result.length > 0) {
+          // Tampilkan preview dalam modal
+          setPreviewItems(result);
+          setModalVisible(true);
+          setDataSN('');
+        } else {
+          Alert.alert(
+            'Info',
+            'Tidak ada data yang ditemukan untuk serial number ini',
+          );
+        }
+        log.info(
+          'Check Item Opname - Screen:',
+          `Berhasil mengambil data untuk SN: ${dataSN}`,
+        );
+      } catch (error) {
         setDataSN('');
+        setCheckingItemOpname([]);
+        Alert.alert(
+          'Info',
+          `Gagal mengambil data untuk SN atau DAT: ${dataSN}`,
+        );
+        log.error('Check Item Opname - Screen', error.message || error);
       }
-      log.info(
-        'Check Item Opname - Screen:',
-        `Berhasil mengambil data untuk SN: ${dataSN}`,
-      );
-    } catch (error) {
-      log.error('Check Item Opname - Screen', error.message || error);
-    }
+    });
+  };
+
+  const handleSelectItem = item => {
+    setSelectedItem(item);
+    setCheckingItemOpname([item]);
+    setModalVisible(false);
+  };
+
+  const handleCloseModal = () => {
+    setModalVisible(false);
+    setPreviewItems([]);
   };
 
   const convertImageToBase64 = async uri => {
@@ -155,31 +201,37 @@ export default function ProcessOpnameScreen() {
 
     const item = checkingItemOpname[0];
 
-    try {
-      await checkAndRefreshToken();
-      let base64Photo = null;
+    await withLoading(async () => {
+      try {
+        let base64Photo = null;
 
-      if (photoUri) {
-        const base64 = await convertImageToBase64(photoUri);
-        base64Photo = base64.startsWith('data:image') ? base64 : null;
+        if (photoUri) {
+          const base64 = await convertImageToBase64(photoUri);
+          base64Photo = base64.startsWith('data:image') ? base64 : null;
+        }
+        await withValidToken(async () => {
+          const result = await saveItemSOContext(
+            dataNoref.noref,
+            item.idBarang,
+            dataSN || item.snBarang,
+            selectedOptionKondisi,
+            location,
+            user.username.toUpperCase(),
+            photoUri ? base64Photo : null,
+          );
+          const resultCondition = await dataConditionContext();
+          setDataCondition(resultCondition);
+          setDataPersentaseOpname(result);
+        });
+        log.info('Save Opname - Screen', 'Success update data opname');
+        setVisible(true);
+        resetInput();
+      } catch (error) {
+        setPhotoUri(null);
+        log.error('Save Opname - Screen', error.message || error);
+        Alert.alert('Error', error.message || error);
       }
-
-      await saveItemSOContext(
-        dataNoref.noref,
-        item.idBarang,
-        dataSN || item.snBarang,
-        selectedOptionKondisi,
-        location,
-        user.username.toUpperCase(),
-        photoUri ? base64Photo : null,
-      );
-      await dataConditionContext();
-      await dataPersentaseSOContext(dataNoref.noref);
-      setVisible(true);
-      resetInput();
-    } catch (error) {
-      Alert.alert('Error', error.message || 'Gagal menyimpan data.');
-    }
+    });
   };
 
   const [visible, setVisible] = React.useState(false);
@@ -195,14 +247,39 @@ export default function ProcessOpnameScreen() {
     }
   };
 
-  console.log(checkingItemOpname);
+  const handleLogout = () => {
+    Alert.alert('Logout Confirmation', 'Apakah Anda yakin ingin keluar?', [
+      {
+        text: 'Batal',
+        onPress: () => log.info('Logout dibatalkan'),
+        style: 'cancel',
+      },
+      {
+        text: 'Keluar',
+        onPress: () => logout(),
+      },
+    ]);
+  };
+
+  if (loading) {
+    return (
+      <>
+        <Appbar.Header>
+          <Appbar.BackAction onPress={backOpnameScreen} />
+          <Appbar.Content title="Stock Opname" />
+          <Appbar.Action icon="logout" onPress={handleLogout} />
+        </Appbar.Header>
+        <LoadingMain text="Processing..." />
+      </>
+    );
+  }
 
   return (
     <>
       <Appbar.Header>
         <Appbar.BackAction onPress={backOpnameScreen} />
-        <Appbar.Content title="Opname" />
-        <Appbar.Action icon="logout" onPress={logout} />
+        <Appbar.Content title="Stock Opname" />
+        <Appbar.Action icon="logout" onPress={handleLogout} />
       </Appbar.Header>
       <ScrollView contentContainerStyle={styles.container}>
         <View accessibilityRole="header">
@@ -216,7 +293,7 @@ export default function ProcessOpnameScreen() {
               disabled={true}
             />
             <FormInput
-              placeholder="Enter Serial Number"
+              placeholder="Enter DAT / Serial Number"
               value={dataSN}
               onChangeText={handleChangeSerialNumber}
               onSubmitEditing={handleSubmitSerialNumber}
@@ -224,50 +301,52 @@ export default function ProcessOpnameScreen() {
             />
             {Array.isArray(checkingItemOpname) &&
               checkingItemOpname.length > 0 && (
-                <View style={styles.listContent}>
-                  {checkingItemOpname.map((item, index) => (
-                    <List.Item
-                      key={index}
-                      title={`${item.idBarang} - ${item.descBarang}`}
-                      description={`${item.datBarang} | ${item.snBarang}`}
-                      titleStyle={styles.itemTitle}
-                      descriptionStyle={styles.itemDescription}
-                      right={props => (
-                        <List.Icon
-                          {...props}
-                          icon={
-                            item.konBarang === true
-                              ? 'check-circle-outline'
-                              : 'close-circle-outline'
-                          }
-                          color={item.konBarang === true ? 'green' : 'red'}
-                        />
-                      )}
-                    />
-                  ))}
-                </View>
+                <>
+                  <View style={styles.listContent}>
+                    {checkingItemOpname.map((item, index) => (
+                      <List.Item
+                        key={index}
+                        title={`${item.idBarang} - ${item.descBarang}`}
+                        description={`${item.datBarang} | ${item.snBarang}`}
+                        titleStyle={styles.itemTitle}
+                        descriptionStyle={styles.itemDescription}
+                        right={props => (
+                          <List.Icon
+                            {...props}
+                            icon={
+                              item.konBarang === true
+                                ? 'check-circle-outline'
+                                : 'close-circle-outline'
+                            }
+                            color={item.konBarang === true ? 'green' : 'red'}
+                          />
+                        )}
+                      />
+                    ))}
+                  </View>
+                  <CameraInput
+                    key={`camera-${resetCount}`}
+                    watermarkText={`NOREF: ${
+                      dataNoref?.noref
+                    } - ${user?.username.toUpperCase()}`}
+                    onCapture={setPhotoUri}
+                  />
+                  <DropdownSelect
+                    key={`condition-${resetCount}`}
+                    options={dataKondisi}
+                    placeholder="Select kondisi"
+                    onSelect={handleSelectKondisi}
+                    selectedValue={dataKondisi.find(
+                      option => option.value === selectedOptionKondisi,
+                    )}
+                  />
+                  <TextArea
+                    placeholder="Enter location"
+                    value={location}
+                    onChangeText={setLocation}
+                  />
+                </>
               )}
-            <CameraInput
-              key={`camera-${resetCount}`}
-              watermarkText={`NOREF: ${
-                dataNoref?.noref
-              } - ${user?.username.toUpperCase()}`}
-              onCapture={setPhotoUri}
-            />
-            <DropdownSelect
-              key={`condition-${resetCount}`}
-              options={dataKondisi}
-              placeholder="Select kondisi"
-              onSelect={handleSelectKondisi}
-              selectedValue={dataKondisi.find(
-                option => option.value === selectedOptionKondisi,
-              )}
-            />
-            <TextArea
-              placeholder="Enter location"
-              value={location}
-              onChangeText={setLocation}
-            />
             <TouchableOpacity
               style={[styles.button, loading && styles.buttonDisabled]}
               onPress={handleSaveRecord}
@@ -282,9 +361,63 @@ export default function ProcessOpnameScreen() {
               {`${update} / ${draft} (${Math.round(progress * 100)}%)`}
             </Text>
           </View>
-          <ProgressBar progress={progress} color={MD3Colors.primary20} />
+          <View style={styles.footerContent}>
+            <ProgressBar progress={progress} color={MD3Colors.primary20} />
+          </View>
         </View>
       </ScrollView>
+      {/* Modal untuk preview dan pemilihan item */}
+      <Portal>
+        <Modal
+          visible={modalVisible}
+          onDismiss={handleCloseModal}
+          contentContainerStyle={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Pilih Item</Text>
+            <Text style={styles.modalSubtitle}>
+              Ditemukan {previewItems.length} asset berikut:
+            </Text>
+            <Divider style={styles.modalDivider} />
+
+            <ScrollView style={styles.modalScrollView}>
+              {previewItems.map((item, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.modalItem}
+                  onPress={() => handleSelectItem(item)}>
+                  <List.Item
+                    title={`${item.idBarang} - ${item.descBarang}`}
+                    description={`${item.datBarang} | ${item.snBarang}`}
+                    titleStyle={styles.itemTitle}
+                    descriptionStyle={styles.itemDescription}
+                    right={props => (
+                      <List.Icon
+                        {...props}
+                        icon={
+                          item.konBarang === true
+                            ? 'check-circle-outline'
+                            : 'close-circle-outline'
+                        }
+                        color={item.konBarang === true ? 'green' : 'red'}
+                      />
+                    )}
+                    style={styles.modalListItem}
+                  />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <View style={styles.modalButtonContainer}>
+              <Button
+                mode="outlined"
+                onPress={handleCloseModal}
+                style={styles.modalButton}>
+                Batal
+              </Button>
+            </View>
+          </View>
+        </Modal>
+      </Portal>
       <Snackbar
         visible={visible}
         onDismiss={onDismissSnackBar}
@@ -297,14 +430,6 @@ export default function ProcessOpnameScreen() {
         style={styles.snackbar}>
         Data berhasil disimpan
       </Snackbar>
-      {loading && (
-        <View style={styles.loadingOverlay}>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#6366f1" />
-            <Text style={styles.loadingText}>Memproses...</Text>
-          </View>
-        </View>
-      )}
     </>
   );
 }
@@ -339,6 +464,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: 'white',
     borderRadius: 2,
+    borderWidth: 1,
+    borderColor: '#a5b4fc',
     fontSize: 12,
     marginTop: 4,
   },
@@ -379,6 +506,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginVertical: 8,
   },
+  footerContent: {
+    marginBottom: 20,
+  },
   textProgress: {
     fontSize: 14,
     color: '#1e293b',
@@ -408,5 +538,52 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 10,
     color: '#1e293b',
+  },
+  // Modal styles
+  modalContainer: {
+    backgroundColor: 'white',
+    margin: 20,
+    maxHeight: '80%',
+    borderWidth: 1,
+    borderRadius: 4,
+    borderColor: '#a5b4fc',
+  },
+  modalContent: {
+    padding: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginBottom: 8,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#4b5563',
+    marginBottom: 16,
+  },
+  modalDivider: {
+    marginBottom: 16,
+  },
+  modalScrollView: {
+    maxHeight: 400,
+  },
+  modalItem: {
+    marginBottom: 8,
+    borderRadius: 4,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  modalListItem: {
+    paddingVertical: 4,
+  },
+  modalButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 16,
+  },
+  modalButton: {
+    minWidth: 80,
   },
 });
