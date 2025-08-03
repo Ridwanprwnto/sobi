@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {TOKEN_KEY} from 'react-native-dotenv';
+import Config from 'react-native-config';
 
 /**
  * storage.js
@@ -8,7 +8,7 @@ import {TOKEN_KEY} from 'react-native-dotenv';
 
 const saveToken = async token => {
   try {
-    await AsyncStorage.setItem(TOKEN_KEY, token);
+    await AsyncStorage.setItem(Config.TOKEN_KEY, token);
   } catch (error) {
     console.error('Failed to save token to storage', error);
   }
@@ -16,7 +16,7 @@ const saveToken = async token => {
 
 const getToken = async () => {
   try {
-    return await AsyncStorage.getItem(TOKEN_KEY);
+    return await AsyncStorage.getItem(Config.TOKEN_KEY);
   } catch (error) {
     console.error('Failed to get token from storage', error);
     return null;
@@ -25,14 +25,25 @@ const getToken = async () => {
 
 const clearToken = async () => {
   try {
-    await AsyncStorage.removeItem(TOKEN_KEY);
+    await AsyncStorage.removeItem(Config.TOKEN_KEY);
   } catch (error) {
     console.error('Failed to remove token from storage', error);
   }
+};
+
+const setTokenExpiration = async exp => {
+  await AsyncStorage.setItem('token_exp', exp.toString());
+};
+
+const getTokenExpiration = async () => {
+  const exp = await AsyncStorage.getItem('token_exp');
+  return exp ? parseInt(exp, 10) : null;
 };
 
 export default {
   saveToken,
   getToken,
   clearToken,
+  setTokenExpiration,
+  getTokenExpiration,
 };
