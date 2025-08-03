@@ -54,7 +54,7 @@ export default function LoginScreen() {
           <View style={styles.header}>
             <Image source={appLogo} style={styles.logo} resizeMode="contain" />
             <Text style={styles.appName}>{Config.APP_NAME}</Text>
-            <Text style={styles.appDesc}>{Config.API_BASE_URL}</Text>
+            <Text style={styles.appDesc}>{Config.APP_DESC}</Text>
           </View>
           <View style={styles.form}>
             <TextInput
