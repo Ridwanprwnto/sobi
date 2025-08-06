@@ -151,9 +151,11 @@ export const AuthProvider = ({children}) => {
   // Function
   const dataDraftSOContext = async (office, department) => {
     try {
+      const token = await storage.getToken();
       const response = await opnameService.dataDraftSOService(
         office,
         department,
+        token,
       );
       if (response.success == true) {
         log.info('Get Draft Opname - Auth: ', response.data);
@@ -171,7 +173,8 @@ export const AuthProvider = ({children}) => {
   // Function
   const dataItemsSOContext = async noref => {
     try {
-      const response = await opnameService.dataItemsSOService(noref);
+      const token = await storage.getToken();
+      const response = await opnameService.dataItemsSOService(noref, token);
       if (response.success == true) {
         log.info('Get Items Opname - Auth: ', response);
         return response;
@@ -188,7 +191,11 @@ export const AuthProvider = ({children}) => {
   // Function
   const dataPersentaseSOContext = async noref => {
     try {
-      const response = await opnameService.dataPersentaseSOService(noref);
+      const token = await storage.getToken();
+      const response = await opnameService.dataPersentaseSOService(
+        noref,
+        token,
+      );
       if (response.success == true) {
         log.info('Get Persentase Opname - Auth: ', response);
         return response;
@@ -205,7 +212,12 @@ export const AuthProvider = ({children}) => {
   // Function
   const dataCheckItemSOContext = async (noref, noid) => {
     try {
-      const response = await opnameService.dataCheckItemSOService(noref, noid);
+      const token = await storage.getToken();
+      const response = await opnameService.dataCheckItemSOService(
+        noref,
+        noid,
+        token,
+      );
       if (response.success == true) {
         log.info('Check Item Opname - Auth: ', response.data);
         return response.data;
@@ -230,6 +242,7 @@ export const AuthProvider = ({children}) => {
     photo,
   ) => {
     try {
+      const token = await storage.getToken();
       const response = await opnameService.saveItemSOService(
         noref,
         nocode,
@@ -238,6 +251,7 @@ export const AuthProvider = ({children}) => {
         location,
         user,
         photo,
+        token,
       );
       if (response.success == true) {
         log.info('Save Item Opname - Auth: ', response);
@@ -278,7 +292,12 @@ export const AuthProvider = ({children}) => {
   // Function
   const handleSendLogFileContext = async (message, logfile) => {
     try {
-      const response = await helpService.sendLogFileService(message, logfile);
+      const token = await storage.getToken();
+      const response = await helpService.sendLogFileService(
+        message,
+        logfile,
+        token,
+      );
       if (response.success == true) {
         log.info('Send Log File - Auth: ', response.data);
         return response.data;

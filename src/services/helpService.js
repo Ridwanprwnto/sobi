@@ -4,7 +4,7 @@ import {Platform} from 'react-native';
 import {log} from '../utils/logger';
 
 const API_URL = Config.API_BASE_URL + Config.API_PATH;
-const SERVICE_PATH = '/help';
+const MAIN_PATH = Config.MAIN_PATH;
 
 /**
  * authService.js
@@ -17,7 +17,7 @@ const api = axios.create({
   headers: {},
 });
 
-const sendLogFileService = async (message, logfile) => {
+const sendLogFileService = async (message, logfile, token) => {
   try {
     const formData = new FormData();
     const fileName = `app-log-${new Date().toISOString()}.log`;
@@ -32,9 +32,10 @@ const sendLogFileService = async (message, logfile) => {
     formData.append('timestamp', new Date().toISOString());
     formData.append('message', message);
 
-    const response = await api.post(`${SERVICE_PATH}/upload-log`, formData, {
+    const response = await api.post(`${MAIN_PATH}/logs`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
+        Authorization: `Bearer ${token}`,
       },
     });
     log.info('Send Log File - Service: ', response.data);

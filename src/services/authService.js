@@ -3,7 +3,8 @@ import Config from 'react-native-config';
 import {log} from '../utils/logger';
 
 const API_URL = Config.API_BASE_URL + Config.API_PATH;
-const SERVICE_PATH = '/auth';
+const AUTH_PATH = Config.AUTH_PATH;
+const MAIN_PATH = Config.MAIN_PATH;
 
 /**
  * authService.js
@@ -20,7 +21,7 @@ const api = axios.create({
 
 const login = async (username, password) => {
   try {
-    const response = await api.post(`${SERVICE_PATH}/login`, {
+    const response = await api.post(`${AUTH_PATH}/users/login`, {
       username,
       password,
     });
@@ -39,7 +40,7 @@ const login = async (username, password) => {
 
 const getUser = async token => {
   try {
-    const response = await api.get(`${SERVICE_PATH}/validation`, {
+    const response = await api.get(`${MAIN_PATH}/token/refresh`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
