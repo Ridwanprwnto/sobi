@@ -3,7 +3,7 @@ import Config from 'react-native-config';
 import {log} from '../utils/logger';
 
 const API_URL = Config.API_BASE_URL + Config.API_PATH;
-const SERVICE_PATH = '/master';
+const MAIN_PATH = Config.MAIN_PATH;
 
 /**
  * opnameService.js
@@ -20,7 +20,7 @@ const api = axios.create({
 
 const dataConditionService = async token => {
   try {
-    const response = await api.get(`${SERVICE_PATH}/kondisi`, {
+    const response = await api.get(`${MAIN_PATH}/conditions`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
