@@ -2,7 +2,7 @@ import axios from 'axios';
 import Config from 'react-native-config';
 import {log} from '../utils/logger';
 
-const API_URL = Config.API_BASE_URL + Config.API_PATH;
+const API_URL = Config.API_BASE_URL + Config.AUTH_API;
 const AUTH_PATH = Config.AUTH_PATH;
 const MAIN_PATH = Config.MAIN_PATH;
 
