@@ -3,7 +3,7 @@ import Config from 'react-native-config';
 import {Platform} from 'react-native';
 import {log} from '../utils/logger';
 
-const API_URL = Config.API_BASE_URL + Config.API_PATH;
+const API_URL = Config.API_BASE_URL + Config.MAIN_API;
 const MAIN_PATH = Config.MAIN_PATH;
 
 /**
