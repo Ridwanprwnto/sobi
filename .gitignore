@@ -78,3 +78,10 @@ yarn-error.log
 .env.development
 .env.test
 .env.production
+
+# Misc
+.vscode/
+
+# Logs
+logs
+*.log

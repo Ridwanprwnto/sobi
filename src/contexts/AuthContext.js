@@ -14,6 +14,7 @@ export const AuthContext = createContext({
   logout: async () => {},
   loadingContext: async () => {},
   refreshToken: async () => {},
+  withValidToken: async () => {},
   dataDraftSOContext: async () => {},
   dataItemsSOContext: async () => {},
   dataPersentaseSOContext: async () => {},
@@ -34,12 +35,14 @@ export const AuthProvider = ({children}) => {
         const token = await storage.getToken();
         if (token) {
           const response = await authService.getUser(token);
-          setUser(response.user);
-          log.info(
-            'Load Token - Auth: ',
-            'Success to load auth token',
-            response.user,
-          );
+          if (response?.success) {
+            setUser(response.user);
+            log.info(
+              'Load Token - Auth:',
+              'Success load auth token',
+              response.user,
+            );
+          }
         }
       } catch (error) {
         log.error('Load Token - Auth:', error || 'Failed to load auth token');
@@ -51,44 +54,66 @@ export const AuthProvider = ({children}) => {
     loadUserData();
   }, []);
 
+  // Auto refresh token
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const expired = await storage.isTokenExpired();
+        if (expired) {
+          log.info('AuthContext: Token expired, mencoba refresh...');
+          await refreshToken();
+        }
+      } catch (err) {
+        log.error('AuthContext: Error saat auto-refresh', err);
+      }
+    }, 5 * 60 * 1000); // setiap 5 menit
+
+    return () => clearInterval(interval);
+  }, []);
+
   // Function to refresh token
   const refreshToken = async () => {
     try {
       const token = await storage.getToken();
-      const response = await authService.getUser(token);
+      if (!token) {
+        log.warn('Refresh Token - Tidak ada token tersimpan');
+        return null;
+      }
 
+      const response = await authService.getUser(token);
       if (response?.success) {
         const newToken = response.token;
 
         if (newToken) {
           log.info(
-            'Refresh Token - Auth: ',
-            response.user?.username || 'Success to refresh auth token',
+            'Refresh Token - Berhasil refresh:',
+            response.user?.username || 'Token diperbarui',
           );
 
           await storage.saveToken(newToken);
-
           const payloadBase64 = newToken.split('.')[1];
           const decoded = JSON.parse(atob(payloadBase64));
-
           await storage.setTokenExpiration(decoded.exp);
-
-          setUser(response.user);
-
-          return newToken;
         } else {
-          log.info(
-            'Refresh Token - Auth: Token masih valid, tidak ada token baru',
-          );
-          return token;
+          log.info('Refresh Token - Token masih valid, tidak perlu diperbarui');
         }
+
+        setUser(response.user);
+        return newToken || token;
       } else {
         log.warn('Refresh Token - Token tidak valid di server');
         await logout();
       }
     } catch (error) {
-      log.error('Refresh Token - Auth: ', error);
-      await logout();
+      log.error('Refresh Token - Error:', error);
+      if (
+        error.message?.includes('401') ||
+        error.message?.includes('Invalid token')
+      ) {
+        await logout();
+      } else {
+        log.warn('Gagal refresh token - kemungkinan masalah jaringan');
+      }
     }
     return null;
   };
@@ -146,7 +171,9 @@ export const AuthProvider = ({children}) => {
     setLoading(bool);
   };
 
-  // -------------------------------------------------------------------
+  // ==============================================================
+  // Bagian Context Function lain (opname, condition, dll)
+  // ==============================================================
 
   // Function
   const dataDraftSOContext = async (office, department) => {
