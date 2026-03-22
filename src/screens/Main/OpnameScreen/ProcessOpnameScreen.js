@@ -547,9 +547,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 4,
     borderColor: '#a5b4fc',
+    flex: 1,
   },
   modalContent: {
     padding: 20,
+    flex: 1,
+    display: 'flex',
   },
   modalTitle: {
     fontSize: 18,
@@ -566,7 +569,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   modalScrollView: {
-    maxHeight: 400,
+    flex: 1,
+    minHeight: 0,
   },
   modalItem: {
     marginBottom: 8,
